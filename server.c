@@ -25,7 +25,7 @@ int setup_listener_socket(char *port) {
 		exit(EXIT_FAILURE);
 	}
 
-	// Loop through list of potential interfaces
+	// Loop through list of potential address candidates
 	// and try setting up a socket on each.
 	for (p = ai; p; p = p->ai_next) {
 		sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
@@ -81,6 +81,12 @@ int main(void) {
 	printf("server: waiting for connections...\n");
 
 	while(1) {
+		int connfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+		if (connfd == -1) {
+			close(sockfd);
+			perror("server: accept error\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	return 0;
