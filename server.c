@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
-#include <sys/_types/_fsfilcnt_t.h>
-#include <sys/_types/_gid_t.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #define PORT "7"
+#define REQ_BUF_SIZE 1 << 14 // 16KiB
 
 int setup_listener_socket(char *port) {
 	int sockfd, error;
@@ -36,7 +35,6 @@ int setup_listener_socket(char *port) {
 
 		// SO_REUSEADDR prevents "address already in use" errors by
 		// enabling duplicate address and port bindings (needed during testing).
-		// TODO: add conditional compilation flag?
 		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 			close(sockfd);
 			perror("server: setsockopt error");
@@ -72,21 +70,29 @@ int setup_listener_socket(char *port) {
 
 int main(void) {
 	struct sockaddr_storage client_addr;
-
 	socklen_t client_len = sizeof(client_addr);
 
 	int sockfd = setup_listener_socket(PORT);
-	printf("socket_fd = %d\n", sockfd);
+
+	char req[REQ_BUF_SIZE];
 
 	printf("server: waiting for connections...\n");
 
 	while(1) {
 		int connfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
 		if (connfd == -1) {
-			close(sockfd);
 			perror("server: accept error\n");
-			exit(EXIT_FAILURE);
+			continue;
 		}
+
+		ssize_t bytes_read;
+		// reminder: `req` is a pointer to the first element (`&req[0]`)
+		while ((bytes_read = recv(connfd, req, sizeof(req), 0)) > 0) {
+			send(connfd, req, bytes_read, 0);
+			printf("received: %s\n", req);
+		}
+
+		close(connfd);
 	}
 
 	return 0;
